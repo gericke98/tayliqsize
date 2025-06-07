@@ -491,31 +491,31 @@ export default function HandCaptureRect() {
       {/* Blur overlay for outside area */}
       <div className="absolute top-0 left-0 w-full h-full">
         {/* Top blur */}
-        <div className="absolute top-0 left-0 w-full h-[30px] backdrop-blur-md"></div>
+        <div className="absolute top-0 left-0 w-full h-[40px] backdrop-blur-xl bg-black/20"></div>
         {/* Bottom blur */}
-        <div className="absolute bottom-0 left-0 w-full h-[30px] backdrop-blur-md"></div>
+        <div className="absolute bottom-0 left-0 w-full h-[40px] backdrop-blur-xl bg-black/20"></div>
         {/* Left blur */}
-        <div className="absolute top-0 left-0 w-[90px] h-full backdrop-blur-md"></div>
+        <div className="absolute top-0 left-0 w-[60px] h-full backdrop-blur-xl bg-black/20"></div>
         {/* Right blur */}
-        <div className="absolute top-0 right-0 w-[90px] h-full backdrop-blur-md"></div>
+        <div className="absolute top-0 right-0 w-[60px] h-full backdrop-blur-xl bg-black/20"></div>
       </div>
 
       {/* Clear capture area */}
       <div
-        className="absolute border-4 border-white/80 rounded-lg"
+        className="absolute border-4 border-white/90 rounded-lg shadow-lg"
         style={{
           width: `${pixelWidth}px`,
           height: `${pixelHeight}px`,
-          top: "30px",
+          top: "40px",
           left: "50%",
           transform: "translateX(-50%)",
         }}
       >
         {/* Corner markers */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white"></div>
-        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white"></div>
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white"></div>
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white"></div>
+        <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white"></div>
+        <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white"></div>
+        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white"></div>
+        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white"></div>
       </div>
 
       <canvas ref={canvasRef} className="hidden" />

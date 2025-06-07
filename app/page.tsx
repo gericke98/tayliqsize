@@ -1,6 +1,6 @@
 "use client";
 
-import HandCapture from "./components/handleCapture2";
+import HandCapture from "./components/handCapture";
 // import HandLandmark from "./components/handLandmark";
 
 export default function Home() {

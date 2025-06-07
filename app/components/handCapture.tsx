@@ -7,6 +7,7 @@ import {
   GestureRecognizer,
   DrawingUtils,
   HandLandmarker,
+  NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
 
 export default function HandCaptureRect() {
@@ -82,179 +83,233 @@ export default function HandCaptureRect() {
 
       if (results.landmarks.length > 0) {
         const ctx = canvasRef.current?.getContext("2d");
-        if (!ctx) {
-          console.error("Could not get canvas context");
-          return;
-        }
-
-        // Clear previous drawings
-        if (canvasRef.current) {
-          ctx.clearRect(
-            0,
-            0,
-            canvasRef.current.width,
-            canvasRef.current.height
-          );
-        }
+        if (!ctx) return;
 
         const drawingUtils = new DrawingUtils(ctx);
+        const landmarks = results.landmarks[0];
 
-        // Calculate scale factors (mm per pixel)
+        // Calculate scale factors (mm per pixel) first
         const mmPerPixelX = realWidthMM / pixelWidth;
         const mmPerPixelY = mmPerPixelX; // Use same scale for both axes to maintain proportions
 
-        for (const landmark of results.landmarks) {
-          // Draw the landmarks
-          drawingUtils.drawConnectors(
-            landmark,
-            GestureRecognizer.HAND_CONNECTIONS,
-            {
-              color: "#00FF00",
-              lineWidth: 2,
-            }
+        // Log all hand landmarks
+        console.log("🖐️ Hand Landmarks (1-21):");
+        console.log("----------------");
+        landmarks.forEach((landmark, index) => {
+          const landmarkNames: Record<number, string> = {
+            0: "WRIST",
+            1: "THUMB_CMC",
+            2: "THUMB_MCP",
+            3: "THUMB_IP",
+            4: "THUMB_TIP",
+            5: "INDEX_FINGER_MCP",
+            6: "INDEX_FINGER_PIP",
+            7: "INDEX_FINGER_DIP",
+            8: "INDEX_FINGER_TIP",
+            9: "MIDDLE_FINGER_MCP",
+            10: "MIDDLE_FINGER_PIP",
+            11: "MIDDLE_FINGER_DIP",
+            12: "MIDDLE_FINGER_TIP",
+            13: "RING_FINGER_MCP",
+            14: "RING_FINGER_PIP",
+            15: "RING_FINGER_DIP",
+            16: "RING_FINGER_TIP",
+            17: "PINKY_MCP",
+            18: "PINKY_PIP",
+            19: "PINKY_DIP",
+            20: "PINKY_TIP",
+          };
+
+          // Convert normalized coordinates to pixels
+          const xPx = landmark.x * img.width;
+          const yPx = landmark.y * img.height;
+
+          // Convert to millimeters using the scale
+          const xMM = xPx * mmPerPixelX;
+          const yMM = yPx * mmPerPixelY;
+
+          console.log(`${index + 1}. ${landmarkNames[index]}:`);
+          console.log(
+            `   Normalized: (${landmark.x.toFixed(3)}, ${landmark.y.toFixed(
+              3
+            )})`
           );
-          drawingUtils.drawLandmarks(landmark, {
-            color: "#FF0000",
-            lineWidth: 1,
-          });
+          console.log(`   Pixels: (${xPx.toFixed(1)}, ${yPx.toFixed(1)})`);
+          console.log(`   Millimeters: (${xMM.toFixed(1)}, ${yMM.toFixed(1)})`);
+          console.log("----------------");
+        });
 
-          // Calculate and log real distances for key points
-          const keyPoints = {
-            // Finger tips
-            indexFingerTip: landmark[8],
-            middleFingerTip: landmark[12],
-            ringFingerTip: landmark[16],
-            pinkyTip: landmark[20],
-            // Knuckles (MCP - Metacarpophalangeal joints)
-            indexFingerMCP: landmark[5],
-            middleFingerMCP: landmark[9],
-            ringFingerMCP: landmark[13],
-            pinkyMCP: landmark[17],
-            // PIP joints (Proximal Interphalangeal)
-            indexFingerPIP: landmark[6],
-            middleFingerPIP: landmark[10],
-            ringFingerPIP: landmark[14],
-            pinkyPIP: landmark[18],
-          };
+        drawingUtils.drawConnectors(
+          landmarks,
+          GestureRecognizer.HAND_CONNECTIONS,
+          {
+            color: "#00FF00",
+            lineWidth: 2,
+          }
+        );
+        drawingUtils.drawLandmarks(landmarks, {
+          color: "#FF0000",
+          lineWidth: 1,
+        });
 
-          // Calculate distances in mm
-          const distances = {
-            // Finger lengths from MCP to tip
-            indexFingerLength: calculateDistance(
-              keyPoints.indexFingerMCP,
-              keyPoints.indexFingerTip,
-              mmPerPixelX,
-              mmPerPixelY
-            ),
-            middleFingerLength: calculateDistance(
-              keyPoints.middleFingerMCP,
-              keyPoints.middleFingerTip,
-              mmPerPixelX,
-              mmPerPixelY
-            ),
-            ringFingerLength: calculateDistance(
-              keyPoints.ringFingerMCP,
-              keyPoints.ringFingerTip,
-              mmPerPixelX,
-              mmPerPixelY
-            ),
-            pinkyLength: calculateDistance(
-              keyPoints.pinkyMCP,
-              keyPoints.pinkyTip,
-              mmPerPixelX,
-              mmPerPixelY
-            ),
+        // Calculate and log real distances for key points
+        const keyPoints = {
+          wrist: landmarks[0],
+          indexTip: landmarks[8],
+          middleTip: landmarks[12],
+          ringTip: landmarks[16],
+          pinkyTip: landmarks[20],
+          indexMCP: landmarks[5],
+          middleMCP: landmarks[9],
+          ringMCP: landmarks[13],
+          pinkyMCP: landmarks[17],
+          indexPIP: landmarks[6],
+          middlePIP: landmarks[10],
+          ringPIP: landmarks[14],
+          pinkyPIP: landmarks[18],
+        };
 
-            // Ring finger measurements using MediaPipe landmarks
-            ringFinger: {
-              // Measure at the PIP joint (middle knuckle) where rings are typically worn
-              width: calculateFingerWidth(
-                landmark,
-                13,
-                14,
-                mmPerPixelX,
-                mmPerPixelY
-              ),
-              // Measure at the MCP joint (base knuckle)
-              baseWidth: calculateFingerWidth(
-                landmark,
-                5,
-                6,
-                mmPerPixelX,
-                mmPerPixelY
-              ),
-            },
-          };
+        // Calculate distances between key points
+        const calculateDistance = (
+          point1: NormalizedLandmark,
+          point2: NormalizedLandmark
+        ) => {
+          const dx = (point1.x - point2.x) * img.width;
+          const dy = (point1.y - point2.y) * img.height;
+          const distancePx = Math.sqrt(dx * dx + dy * dy);
+          return distancePx * mmPerPixelX;
+        };
 
-          // Log only the final measurements
-          console.log("Measurements (all in millimeters):", {
-            fingers: {
-              index: `${distances.indexFingerLength.toFixed(1)}mm`,
-              middle: `${distances.middleFingerLength.toFixed(1)}mm`,
-              ring: `${distances.ringFingerLength.toFixed(1)}mm`,
-              pinky: `${distances.pinkyLength.toFixed(1)}mm`,
-            },
-            ringFinger: {
-              width: `${distances.ringFinger.width.toFixed(
-                1
-              )}mm (at middle knuckle)`,
-              baseWidth: `${distances.ringFinger.baseWidth.toFixed(
-                1
-              )}mm (at base knuckle)`,
-              // Calculate ring size (US standard)
-              ringSize: (
-                (distances.ringFinger.width * Math.PI) /
-                3.14159
-              ).toFixed(1),
-            },
-          });
-        }
+        // Log distances
+        console.log("📏 Finger Measurements:");
+        console.log("----------------");
+
+        // Index finger
+        console.log("Index Finger:");
+        console.log(
+          `MCP to Tip: ${calculateDistance(
+            keyPoints.indexMCP,
+            keyPoints.indexTip
+          ).toFixed(1)}mm`
+        );
+        console.log(
+          `MCP to PIP: ${calculateDistance(
+            keyPoints.indexMCP,
+            keyPoints.indexPIP
+          ).toFixed(1)}mm`
+        );
+        console.log(
+          `PIP to Tip: ${calculateDistance(
+            keyPoints.indexPIP,
+            keyPoints.indexTip
+          ).toFixed(1)}mm`
+        );
+
+        // Middle finger
+        console.log("Middle Finger:");
+        console.log(
+          `MCP to Tip: ${calculateDistance(
+            keyPoints.middleMCP,
+            keyPoints.middleTip
+          ).toFixed(1)}mm`
+        );
+        console.log(
+          `MCP to PIP: ${calculateDistance(
+            keyPoints.middleMCP,
+            keyPoints.middlePIP
+          ).toFixed(1)}mm`
+        );
+        console.log(
+          `PIP to Tip: ${calculateDistance(
+            keyPoints.middlePIP,
+            keyPoints.middleTip
+          ).toFixed(1)}mm`
+        );
+
+        // Ring finger
+        console.log("Ring Finger:");
+        console.log(
+          `MCP to Tip: ${calculateDistance(
+            keyPoints.ringMCP,
+            keyPoints.ringTip
+          ).toFixed(1)}mm`
+        );
+        console.log(
+          `MCP to PIP: ${calculateDistance(
+            keyPoints.ringMCP,
+            keyPoints.ringPIP
+          ).toFixed(1)}mm`
+        );
+        console.log(
+          `PIP to Tip: ${calculateDistance(
+            keyPoints.ringPIP,
+            keyPoints.ringTip
+          ).toFixed(1)}mm`
+        );
+
+        // Pinky
+        console.log("Pinky:");
+        console.log(
+          `MCP to Tip: ${calculateDistance(
+            keyPoints.pinkyMCP,
+            keyPoints.pinkyTip
+          ).toFixed(1)}mm`
+        );
+        console.log(
+          `MCP to PIP: ${calculateDistance(
+            keyPoints.pinkyMCP,
+            keyPoints.pinkyPIP
+          ).toFixed(1)}mm`
+        );
+        console.log(
+          `PIP to Tip: ${calculateDistance(
+            keyPoints.pinkyPIP,
+            keyPoints.pinkyTip
+          ).toFixed(1)}mm`
+        );
+
+        console.log("----------------");
+
+        // Draw measurement lines
+        const drawMeasurementLine = (
+          point1: NormalizedLandmark,
+          point2: NormalizedLandmark,
+          color: string
+        ) => {
+          ctx.beginPath();
+          ctx.moveTo(point1.x * img.width, point1.y * img.height);
+          ctx.lineTo(point2.x * img.width, point2.y * img.height);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        };
+
+        // Draw finger measurements
+        drawMeasurementLine(keyPoints.indexMCP, keyPoints.indexTip, "#FF0000");
+        drawMeasurementLine(
+          keyPoints.middleMCP,
+          keyPoints.middleTip,
+          "#00FF00"
+        );
+        drawMeasurementLine(keyPoints.ringMCP, keyPoints.ringTip, "#0000FF");
+        drawMeasurementLine(keyPoints.pinkyMCP, keyPoints.pinkyTip, "#FF00FF");
+
+        // Add measurement labels
+        ctx.fillStyle = "#000000";
+        ctx.font = "12px Arial";
+        ctx.fillText(
+          `${calculateDistance(keyPoints.ringMCP, keyPoints.ringTip).toFixed(
+            1
+          )}mm`,
+          keyPoints.ringTip.x * img.width,
+          keyPoints.ringTip.y * img.height - 10
+        );
       } else {
         console.log("No hands detected in the image");
       }
-    } catch (error) {
-      console.error("Error processing image:", error);
+    } catch (err) {
+      console.error("Error processing image:", err);
     }
-  };
-
-  // Helper function to calculate finger width using MediaPipe landmarks
-  const calculateFingerWidth = (
-    landmark: { x: number; y: number }[],
-    startIndex: number,
-    endIndex: number,
-    mmPerPixelX: number,
-    mmPerPixelY: number
-  ) => {
-    // Get all points between the start and end indices
-    const points = landmark.slice(startIndex, endIndex + 1);
-
-    // Find the leftmost and rightmost points
-    let leftmost = points[0];
-    let rightmost = points[0];
-
-    for (const point of points) {
-      if (point.x < leftmost.x) leftmost = point;
-      if (point.x > rightmost.x) rightmost = point;
-    }
-
-    // Calculate the width using these points
-    return calculateDistance(leftmost, rightmost, mmPerPixelX, mmPerPixelY);
-  };
-
-  // Helper function to calculate real distance between two points
-  const calculateDistance = (
-    point1: { x: number; y: number },
-    point2: { x: number; y: number },
-    mmPerPixelX: number,
-    mmPerPixelY: number
-  ) => {
-    const dx = (point2.x - point1.x) * pixelWidth;
-    const dy = (point2.y - point1.y) * pixelHeight;
-
-    const dxMM = dx * mmPerPixelX;
-    const dyMM = dy * mmPerPixelY;
-
-    return Math.sqrt(dxMM * dxMM + dyMM * dyMM);
   };
 
   const capture = () => {

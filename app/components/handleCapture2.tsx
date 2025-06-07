@@ -16,15 +16,35 @@ export default function HandCaptureRect() {
   const [handLandmarker, setHandLandmarker] = useState<HandLandmarker | null>(
     null
   );
+  const [isFrontCamera, setIsFrontCamera] = useState(true);
 
   const REAL_CARD_WIDTH_MM = 85.6; // ancho estándar de tarjeta bancaria/DNI
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+    // Initialize camera with better constraints for iPhone
+    const initializeCamera = async () => {
+      try {
+        const constraints = {
+          video: {
+            facingMode: isFrontCamera ? "user" : "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            // iPhone specific constraints
+            frameRate: { ideal: 30 },
+            aspectRatio: { ideal: 1.333333 },
+          },
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error("Error accessing camera:", error);
       }
-    });
+    };
+
+    initializeCamera();
 
     const initializeHandLandmarker = async () => {
       try {
@@ -48,7 +68,26 @@ export default function HandCaptureRect() {
     };
 
     initializeHandLandmarker();
-  }, []);
+
+    // Cleanup function
+    return () => {
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [isFrontCamera]); // Re-initialize when camera changes
+
+  const switchCamera = async () => {
+    // Stop current stream
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+    }
+
+    // Switch camera
+    setIsFrontCamera(!isFrontCamera);
+  };
 
   const capture = () => {
     const video = videoRef.current;
@@ -140,12 +179,20 @@ export default function HandCaptureRect() {
 
       <canvas ref={canvasRef} className="hidden" />
 
-      <button
-        onClick={capture}
-        className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black text-white px-4 py-2 rounded-lg shadow-md"
-      >
-        Tomar foto
-      </button>
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-4">
+        <button
+          onClick={capture}
+          className="bg-black text-white px-4 py-2 rounded-lg shadow-md"
+        >
+          Tomar foto
+        </button>
+        <button
+          onClick={switchCamera}
+          className="bg-black text-white px-4 py-2 rounded-lg shadow-md"
+        >
+          {isFrontCamera ? "Cámara trasera" : "Cámara frontal"}
+        </button>
+      </div>
 
       {capturedImage && (
         <div className="mt-4 text-center">

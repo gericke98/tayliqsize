@@ -10,57 +10,16 @@ import {
   NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
 
-// Add Popup component with improved styling and close button
-const Popup = ({
-  message,
-  onClose,
-}: {
-  message: string;
-  onClose: () => void;
-}) => {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 5000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 animate-fade-in">
-      <div className="bg-white p-6 rounded-xl shadow-2xl max-w-md mx-4 border border-gray-100 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-        <p className="text-lg text-center text-gray-800 pr-6">{message}</p>
-      </div>
-    </div>
-  );
-};
-
 export default function HandCaptureRect() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [showPopup, setShowPopup] = useState(false);
+  const [ringWidth, setRingWidth] = useState<number | null>(null);
   const [handLandmarker, setHandLandmarker] = useState<HandLandmarker | null>(
     null
   );
-  const [showInstructions, setShowInstructions] = useState(true);
-  const [showResults, setShowResults] = useState(false);
-  const [ringWidth, setRingWidth] = useState<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Medidas reales del rectángulo (en mm)
   const realWidthMM = 200;
@@ -80,6 +39,7 @@ export default function HandCaptureRect() {
     navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        streamRef.current = stream;
       }
     });
 
@@ -123,7 +83,31 @@ export default function HandCaptureRect() {
         img.onload = () => resolve();
       });
 
-      const results = handLandmarker.detect(img);
+      // Create a temporary canvas to flip the image for MediaPipe
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = pixelWidth;
+      tempCanvas.height = pixelHeight;
+      const tempCtx = tempCanvas.getContext("2d");
+      if (!tempCtx) return;
+
+      // Flip the image horizontally for MediaPipe
+      tempCtx.translate(pixelWidth, 0);
+      tempCtx.scale(-1, 1);
+      tempCtx.drawImage(img, 0, 0, pixelWidth, pixelHeight);
+
+      // Get the flipped image data
+      const flippedImageData = tempCanvas.toDataURL("image/png");
+
+      // Create a new image from the flipped data
+      const flippedImg = document.createElement("img");
+      flippedImg.src = flippedImageData;
+      flippedImg.width = pixelWidth;
+      flippedImg.height = pixelHeight;
+      await new Promise<void>((resolve) => {
+        flippedImg.onload = () => resolve();
+      });
+
+      const results = handLandmarker.detect(flippedImg);
 
       if (results.landmarks.length > 0) {
         const ctx = canvasRef.current?.getContext("2d");
@@ -265,12 +249,6 @@ export default function HandCaptureRect() {
         );
         console.log("----------------");
 
-        // Calculate ring width (average of PIP distances)
-        const ringWidthMM =
-          (measurements.ringToMiddlePIP + measurements.middleToIndexPIP) / 2;
-        setRingWidth(ringWidthMM);
-        setShowResults(true);
-
         // Draw measurement lines and perpendiculars
         const drawPerpendicularLine = (
           point: NormalizedLandmark,
@@ -358,6 +336,13 @@ export default function HandCaptureRect() {
           color: "#FF0000",
           lineWidth: 1,
         });
+
+        // Calculate ring width as average of PIP joint distances
+        const ringWidthMM =
+          (measurements.ringToMiddlePIP + measurements.middleToIndexPIP) / 2;
+        const ringWidthCM = ringWidthMM / 10; // Convert to centimeters
+        setRingWidth(Number(ringWidthCM.toFixed(1)));
+        setShowPopup(true);
       } else {
         console.log("No hands detected in the image");
       }
@@ -426,6 +411,12 @@ export default function HandCaptureRect() {
         // Process the captured image
         processImage(dataUrl);
 
+        // Stop the camera stream
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
+
         // Calculate and log the actual scale
         const scaleMMPerPx = realWidthMM / pixelWidth;
         console.log("Scale (mm/px):", scaleMMPerPx);
@@ -439,56 +430,74 @@ export default function HandCaptureRect() {
 
   return (
     <div className="relative w-[480px] h-[360px] mx-auto">
-      {showInstructions && (
-        <Popup
-          message="Alinea la base de la mano con la línea inferior y el dedo más alto con la línea superior. Haz la foto con los dedos juntos."
-          onClose={() => setShowInstructions(false)}
-        />
-      )}
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className="absolute top-0 left-0 w-full h-full object-cover rounded-2xl shadow-lg scale-x-[-1]"
+      />
 
-      {showResults && ringWidth !== null && (
-        <Popup
-          message={`Ancho del dedo anular: ${ringWidth.toFixed(1)}mm`}
-          onClose={() => setShowResults(false)}
-        />
-      )}
+      {/* Blur overlay for outside area */}
+      <div className="absolute top-0 left-0 w-full h-full">
+        {/* Top blur */}
+        <div className="absolute top-0 left-0 w-full h-[30px] backdrop-blur-md"></div>
+        {/* Bottom blur */}
+        <div className="absolute bottom-0 left-0 w-full h-[30px] backdrop-blur-md"></div>
+        {/* Left blur */}
+        <div className="absolute top-0 left-0 w-[90px] h-full backdrop-blur-md"></div>
+        {/* Right blur */}
+        <div className="absolute top-0 right-0 w-[90px] h-full backdrop-blur-md"></div>
+      </div>
 
-      {!capturedImage ? (
-        <div className="relative w-full h-full rounded-2xl overflow-hidden">
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="absolute top-0 left-0 w-full h-full object-cover"
+      {/* Clear capture area */}
+      <div
+        className="absolute border-4 border-white/80 rounded-lg"
+        style={{
+          width: `${pixelWidth}px`,
+          height: `${pixelHeight}px`,
+          top: "30px",
+          left: "90px",
+        }}
+      >
+        {/* Corner markers */}
+        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white"></div>
+        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white"></div>
+        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white"></div>
+        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white"></div>
+      </div>
+
+      <canvas ref={canvasRef} className="hidden" />
+
+      {/* Improved capture button */}
+      <button
+        onClick={capture}
+        className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-6 py-3 rounded-full shadow-lg hover:bg-gray-100 transition-colors duration-200 flex items-center gap-2 z-10"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z"
+            clipRule="evenodd"
           />
+        </svg>
+        Tomar foto
+      </button>
 
-          <div
-            className="absolute border-4 border-dashed border-white rounded-lg shadow-lg"
-            style={{
-              width: `${pixelWidth}px`,
-              height: `${pixelHeight}px`,
-              top: "30px",
-              left: "90px",
-            }}
-          ></div>
-
-          <button
-            onClick={capture}
-            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black text-white px-6 py-2 rounded-full shadow-lg hover:bg-gray-800 transition-colors duration-200"
-          >
-            Tomar foto
-          </button>
-        </div>
-      ) : (
-        <div className="w-full h-full">
-          <div className="relative w-full h-full rounded-2xl overflow-hidden">
+      {capturedImage && (
+        <div className="mt-8 text-center">
+          <div className="relative w-48 h-48 mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
             <Image
               src={capturedImage}
               alt="Captura"
               width={pixelWidth}
               height={pixelHeight}
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain scale-x-[-1]"
             />
             <canvas
               ref={canvasRef}
@@ -497,16 +506,28 @@ export default function HandCaptureRect() {
               className="absolute top-0 left-0 w-full h-full"
             />
           </div>
-          <button
-            onClick={() => {
-              setCapturedImage(null);
-              setShowResults(false);
-              setRingWidth(null);
-            }}
-            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black text-white px-6 py-2 rounded-full shadow-lg hover:bg-gray-800 transition-colors duration-200"
-          >
-            Volver a tomar foto
-          </button>
+          <p className="mt-4 text-sm text-gray-600">
+            Las medidas se mostrarán en la consola
+          </p>
+        </div>
+      )}
+
+      {showPopup && ringWidth !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 shadow-xl max-w-sm w-full mx-4">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">
+              Medida del Anillo
+            </h3>
+            <p className="text-4xl font-bold text-blue-600 text-center mb-6">
+              {ringWidth} cm
+            </p>
+            <button
+              onClick={() => setShowPopup(false)}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition-colors duration-200"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Hands, HAND_CONNECTIONS } from "@mediapipe/hands";
 import { drawConnectors, drawLandmarks } from "@mediapipe/drawing_utils";
+import Image from "next/image";
 
 export default function Home() {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
@@ -69,7 +70,7 @@ export default function Home() {
       <input type="file" accept="image/*" onChange={handleFileChange} />
       {imgUrl && (
         <div className="space-y-2">
-          <img ref={imageRef} src={imgUrl} alt="mano" className="hidden" />
+          <Image ref={imageRef} src={imgUrl} alt="mano" className="hidden" />
           <canvas ref={canvasRef} />
           {width && (
             <p>Ancho aproximado de la falange: {width.toFixed(2)} px</p>

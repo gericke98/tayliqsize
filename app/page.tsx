@@ -72,7 +72,7 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="mt-12 text-center text-gray-500 text-sm">
-          <p>Para ver las medidas, abre la consola del navegador (F12)</p>
+          <p>Tayliq Size - 2025 - All rights reserved</p>
         </footer>
       </div>
     </main>

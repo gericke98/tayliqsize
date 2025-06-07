@@ -17,6 +17,7 @@ export default function HandCaptureRect() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showPopup, setShowPopup] = useState(false);
   const [ringWidth, setRingWidth] = useState<number | null>(null);
+  const [confidence, setConfidence] = useState<number | null>(null);
   const [handLandmarker, setHandLandmarker] = useState<HandLandmarker | null>(
     null
   );
@@ -146,6 +147,14 @@ export default function HandCaptureRect() {
       if (!results.landmarks.length) return;
 
       const landmarks = results.landmarks[0];
+      const worldLandmarks = results.worldLandmarks[0];
+
+      // Calculate average confidence score
+      const avgConfidence =
+        worldLandmarks.reduce((sum, landmark) => sum + landmark.z, 0) /
+        worldLandmarks.length;
+      setConfidence(Number((avgConfidence * 100).toFixed(1)));
+
       const mmPerPixel = realWidthMM / CAPTURE_SIZE;
 
       const px = (l: NormalizedLandmark) => l.x * CAPTURE_SIZE;
@@ -253,9 +262,14 @@ export default function HandCaptureRect() {
             <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">
               Medida del Anillo
             </h3>
-            <p className="text-4xl font-bold text-blue-600 text-center mb-6">
+            <p className="text-4xl font-bold text-blue-600 text-center mb-2">
               {ringWidth} cm
             </p>
+            {confidence !== null && (
+              <p className="text-sm text-gray-600 text-center mb-6">
+                Confianza: {confidence}%
+              </p>
+            )}
             <button
               onClick={() => setShowPopup(false)}
               className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors duration-200"

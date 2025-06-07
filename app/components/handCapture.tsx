@@ -479,7 +479,7 @@ export default function HandCaptureRect() {
   };
 
   return (
-    <div className="relative w-full max-w-[480px] h-[360px] mx-auto">
+    <div className="relative w-full max-w-[480px] h-[calc(100vh-2rem)] mx-auto">
       <video
         ref={videoRef}
         autoPlay
@@ -491,43 +491,58 @@ export default function HandCaptureRect() {
       {/* Blur overlay for outside area */}
       <div className="absolute top-0 left-0 w-full h-full">
         {/* Top blur */}
-        <div className="absolute top-0 left-0 w-full h-[40px] backdrop-blur-xl bg-black/20"></div>
+        <div className="absolute top-0 left-0 w-full h-[20%]">
+          <div className="absolute inset-0 backdrop-blur-2xl bg-black/40"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-transparent"></div>
+        </div>
         {/* Bottom blur */}
-        <div className="absolute bottom-0 left-0 w-full h-[40px] backdrop-blur-xl bg-black/20"></div>
+        <div className="absolute bottom-0 left-0 w-full h-[20%]">
+          <div className="absolute inset-0 backdrop-blur-2xl bg-black/40"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+        </div>
         {/* Left blur */}
-        <div className="absolute top-0 left-0 w-[60px] h-full backdrop-blur-xl bg-black/20"></div>
+        <div className="absolute top-0 left-0 w-[10%] h-full">
+          <div className="absolute inset-0 backdrop-blur-2xl bg-black/40"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent"></div>
+        </div>
         {/* Right blur */}
-        <div className="absolute top-0 right-0 w-[60px] h-full backdrop-blur-xl bg-black/20"></div>
+        <div className="absolute top-0 right-0 w-[10%] h-full">
+          <div className="absolute inset-0 backdrop-blur-2xl bg-black/40"></div>
+          <div className="absolute inset-0 bg-gradient-to-l from-black/30 to-transparent"></div>
+        </div>
       </div>
 
-      {/* Clear capture area */}
+      {/* Clear capture area with enhanced border */}
       <div
         className="absolute border-4 border-white/90 rounded-lg shadow-lg"
         style={{
           width: `${pixelWidth}px`,
           height: `${pixelHeight}px`,
-          top: "40px",
+          top: "45%",
           left: "50%",
-          transform: "translateX(-50%)",
+          transform: "translate(-50%, -50%)",
         }}
       >
-        {/* Corner markers */}
-        <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white"></div>
-        <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white"></div>
-        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white"></div>
-        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white"></div>
+        {/* Corner markers with enhanced visibility */}
+        <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white shadow-[0_0_8px_rgba(255,255,255,0.5)]"></div>
+        <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white shadow-[0_0_8px_rgba(255,255,255,0.5)]"></div>
+        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white shadow-[0_0_8px_rgba(255,255,255,0.5)]"></div>
+        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white shadow-[0_0_8px_rgba(255,255,255,0.5)]"></div>
       </div>
 
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Improved capture button */}
+      {/* Improved capture button positioned below the box */}
       <button
         onClick={capture}
-        className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-6 py-3 rounded-full shadow-lg hover:bg-gray-100 transition-colors duration-200 flex items-center gap-2 z-10"
+        className="absolute left-1/2 transform -translate-x-1/2 bg-white text-black px-8 py-4 rounded-full shadow-lg hover:bg-gray-100 transition-colors duration-200 flex items-center gap-2 z-10"
+        style={{
+          top: `calc(45% + ${pixelHeight / 2}px + 20px)`,
+        }}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="h-5 w-5"
+          className="h-6 w-6"
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -542,7 +557,7 @@ export default function HandCaptureRect() {
 
       {capturedImage && (
         <div className="mt-8 text-center">
-          <div className="relative w-48 h-48 mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="relative w-full max-w-[240px] h-[320px] mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
             <Image
               src={capturedImage}
               alt="Captura"
@@ -565,11 +580,11 @@ export default function HandCaptureRect() {
 
       {showPopup && ringWidth !== null && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-8 shadow-xl max-w-sm w-full mx-4">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">
+          <div className="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4">
+            <h3 className="text-xl font-bold text-gray-900 mb-3 text-center">
               Medida del Anillo
             </h3>
-            <p className="text-4xl font-bold text-blue-600 text-center mb-6">
+            <p className="text-3xl font-bold text-blue-600 text-center mb-4">
               {ringWidth} cm
             </p>
             <button

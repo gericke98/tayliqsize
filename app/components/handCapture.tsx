@@ -39,17 +39,12 @@ export default function HandCaptureRect() {
     // Check if device is mobile
     const checkMobile = () => {
       const userAgent =
-        navigator.userAgent ||
-        navigator.vendor ||
-        (window as Window & { opera?: string }).opera ||
-        "";
-      const mobileRegex =
-        /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
-      setIsMobile(mobileRegex.test(userAgent.toLowerCase()));
+        navigator.userAgent || navigator.vendor || (window as any).opera;
+      return /android|iPad|iPhone|iPod/i.test(userAgent);
     };
-    checkMobile();
+    setIsMobile(checkMobile());
 
-    // Initialize camera with back camera preference for mobile
+    // Initialize camera with back camera preference
     const initializeCamera = async () => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -57,19 +52,15 @@ export default function HandCaptureRect() {
           (device) => device.kind === "videoinput"
         );
 
-        // Find back camera on mobile devices
+        // Find back camera (usually the last one in the list on mobile devices)
         const backCamera = isMobile
-          ? videoDevices.find((device) =>
-              device.label.toLowerCase().includes("back")
-            ) || videoDevices[videoDevices.length - 1]
+          ? videoDevices[videoDevices.length - 1]
           : videoDevices[0];
 
         const constraints = {
           video: {
             deviceId: backCamera ? { exact: backCamera.deviceId } : undefined,
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: isMobile ? "environment" : "user",
+            facingMode: isMobile ? { exact: "environment" } : "user",
           },
         };
 
@@ -81,12 +72,16 @@ export default function HandCaptureRect() {
       } catch (error) {
         console.error("Error accessing camera:", error);
         // Fallback to any available camera
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          streamRef.current = stream;
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            streamRef.current = stream;
+          }
+        } catch (fallbackError) {
+          console.error("Error accessing fallback camera:", fallbackError);
         }
       }
     };
@@ -116,6 +111,13 @@ export default function HandCaptureRect() {
     };
 
     initializeHandLandmarker();
+
+    // Cleanup function
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
   }, [isMobile]);
 
   const processImage = async (imageUrl: string) => {
@@ -479,7 +481,7 @@ export default function HandCaptureRect() {
   };
 
   return (
-    <div className="relative w-full max-w-[480px] h-[calc(100vh-2rem)] mx-auto">
+    <div className="relative w-full max-w-[480px] h-[360px] mx-auto">
       <video
         ref={videoRef}
         autoPlay
@@ -488,61 +490,46 @@ export default function HandCaptureRect() {
         className="absolute top-0 left-0 w-full h-full object-cover rounded-2xl shadow-lg scale-x-[-1]"
       />
 
-      {/* Blur overlay for outside area */}
+      {/* Blur overlay for outside area - iOS compatible */}
       <div className="absolute top-0 left-0 w-full h-full">
         {/* Top blur */}
-        <div className="absolute top-0 left-0 w-full h-[20%]">
-          <div className="absolute inset-0 backdrop-blur-2xl bg-black/40"></div>
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-transparent"></div>
-        </div>
+        <div className="absolute top-0 left-0 w-full h-[30px] bg-black/30 backdrop-blur-[2px]"></div>
         {/* Bottom blur */}
-        <div className="absolute bottom-0 left-0 w-full h-[20%]">
-          <div className="absolute inset-0 backdrop-blur-2xl bg-black/40"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
-        </div>
+        <div className="absolute bottom-0 left-0 w-full h-[30px] bg-black/30 backdrop-blur-[2px]"></div>
         {/* Left blur */}
-        <div className="absolute top-0 left-0 w-[10%] h-full">
-          <div className="absolute inset-0 backdrop-blur-2xl bg-black/40"></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent"></div>
-        </div>
+        <div className="absolute top-0 left-0 w-[90px] h-full bg-black/30 backdrop-blur-[2px]"></div>
         {/* Right blur */}
-        <div className="absolute top-0 right-0 w-[10%] h-full">
-          <div className="absolute inset-0 backdrop-blur-2xl bg-black/40"></div>
-          <div className="absolute inset-0 bg-gradient-to-l from-black/30 to-transparent"></div>
-        </div>
+        <div className="absolute top-0 right-0 w-[90px] h-full bg-black/30 backdrop-blur-[2px]"></div>
       </div>
 
-      {/* Clear capture area with enhanced border */}
+      {/* Clear capture area */}
       <div
         className="absolute border-4 border-white/90 rounded-lg shadow-lg"
         style={{
           width: `${pixelWidth}px`,
           height: `${pixelHeight}px`,
-          top: "45%",
+          top: "30px",
           left: "50%",
-          transform: "translate(-50%, -50%)",
+          transform: "translateX(-50%)",
         }}
       >
-        {/* Corner markers with enhanced visibility */}
-        <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white shadow-[0_0_8px_rgba(255,255,255,0.5)]"></div>
-        <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white shadow-[0_0_8px_rgba(255,255,255,0.5)]"></div>
-        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white shadow-[0_0_8px_rgba(255,255,255,0.5)]"></div>
-        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white shadow-[0_0_8px_rgba(255,255,255,0.5)]"></div>
+        {/* Corner markers */}
+        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white"></div>
+        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white"></div>
+        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white"></div>
+        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white"></div>
       </div>
 
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Improved capture button positioned below the box */}
+      {/* Improved capture button for mobile */}
       <button
         onClick={capture}
-        className="absolute left-1/2 transform -translate-x-1/2 bg-white text-black px-8 py-4 rounded-full shadow-lg hover:bg-gray-100 transition-colors duration-200 flex items-center gap-2 z-10"
-        style={{
-          top: `calc(45% + ${pixelHeight / 2}px + 20px)`,
-        }}
+        className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-6 py-3 rounded-full shadow-lg hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 flex items-center gap-2 z-10 touch-manipulation"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
+          className="h-5 w-5"
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -557,7 +544,7 @@ export default function HandCaptureRect() {
 
       {capturedImage && (
         <div className="mt-8 text-center">
-          <div className="relative w-full max-w-[240px] h-[320px] mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="relative w-48 h-48 mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
             <Image
               src={capturedImage}
               alt="Captura"
@@ -580,16 +567,16 @@ export default function HandCaptureRect() {
 
       {showPopup && ringWidth !== null && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4">
-            <h3 className="text-xl font-bold text-gray-900 mb-3 text-center">
+          <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm mx-auto">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">
               Medida del Anillo
             </h3>
-            <p className="text-3xl font-bold text-blue-600 text-center mb-4">
+            <p className="text-4xl font-bold text-blue-600 text-center mb-6">
               {ringWidth} cm
             </p>
             <button
               onClick={() => setShowPopup(false)}
-              className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition-colors duration-200"
+              className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors duration-200 touch-manipulation"
             >
               Cerrar
             </button>

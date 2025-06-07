@@ -149,16 +149,87 @@ export default function HandCaptureRect() {
         const cardWidthPx = cardRightPx - cardLeftPx;
         const scaleMMperPx = REAL_CARD_WIDTH_MM / cardWidthPx;
 
+        // Calculate finger measurements
         const pip = landmarks[14];
         const mcp = landmarks[13];
-        const pixelWidth = Math.abs((pip.x - mcp.x) * img.width);
-        const fingerWidthMM = pixelWidth * scaleMMperPx;
+        const tip = landmarks[16];
+        const base = landmarks[5];
 
+        // Calculate widths
+        const pipWidthPx = Math.abs((pip.x - mcp.x) * img.width);
+        const baseWidthPx = Math.abs((base.x - landmarks[9].x) * img.width);
+
+        // Calculate lengths
+        const fingerLengthPx = Math.abs((tip.y - base.y) * img.height);
+
+        // Convert to millimeters
+        const pipWidthMM = pipWidthPx * scaleMMperPx;
+        const baseWidthMM = baseWidthPx * scaleMMperPx;
+        const fingerLengthMM = fingerLengthPx * scaleMMperPx;
+
+        // Log all measurements
+        console.log("📏 Measurements:");
+        console.log("----------------");
         console.log(
-          "🧠 Ring finger width (at PIP):",
-          fingerWidthMM.toFixed(2),
+          "Finger Width (at PIP joint):",
+          pipWidthMM.toFixed(2),
           "mm"
         );
+        console.log("Finger Width (at base):", baseWidthMM.toFixed(2), "mm");
+        console.log("Finger Length:", fingerLengthMM.toFixed(2), "mm");
+        console.log("----------------");
+        console.log("Raw pixel measurements:");
+        console.log("PIP Width (px):", pipWidthPx.toFixed(2));
+        console.log("Base Width (px):", baseWidthPx.toFixed(2));
+        console.log("Length (px):", fingerLengthPx.toFixed(2));
+        console.log("Scale (mm/px):", scaleMMperPx.toFixed(4));
+        console.log("----------------");
+
+        // Draw measurement lines
+        if (ctx) {
+          // Draw width line at PIP
+          ctx.beginPath();
+          ctx.moveTo(pip.x * img.width, pip.y * img.height);
+          ctx.lineTo(mcp.x * img.width, mcp.y * img.height);
+          ctx.strokeStyle = "#FF0000";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Draw width line at base
+          ctx.beginPath();
+          ctx.moveTo(base.x * img.width, base.y * img.height);
+          ctx.lineTo(landmarks[9].x * img.width, landmarks[9].y * img.height);
+          ctx.strokeStyle = "#0000FF";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Draw length line
+          ctx.beginPath();
+          ctx.moveTo(tip.x * img.width, tip.y * img.height);
+          ctx.lineTo(base.x * img.width, base.y * img.height);
+          ctx.strokeStyle = "#00FF00";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Add measurement labels
+          ctx.fillStyle = "#000000";
+          ctx.font = "12px Arial";
+          ctx.fillText(
+            `Width: ${pipWidthMM.toFixed(1)}mm`,
+            pip.x * img.width,
+            pip.y * img.height - 10
+          );
+          ctx.fillText(
+            `Base: ${baseWidthMM.toFixed(1)}mm`,
+            base.x * img.width,
+            base.y * img.height - 10
+          );
+          ctx.fillText(
+            `Length: ${fingerLengthMM.toFixed(1)}mm`,
+            tip.x * img.width,
+            tip.y * img.height - 10
+          );
+        }
       } else {
         console.log("No hands detected");
       }

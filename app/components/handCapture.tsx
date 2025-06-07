@@ -39,7 +39,10 @@ export default function HandCaptureRect() {
     // Check if device is mobile
     const checkMobile = () => {
       const userAgent =
-        navigator.userAgent || navigator.vendor || (window as any).opera;
+        navigator.userAgent ||
+        navigator.vendor ||
+        (window as Window & { opera?: string }).opera ||
+        "";
       const mobileRegex =
         /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
       setIsMobile(mobileRegex.test(userAgent.toLowerCase()));

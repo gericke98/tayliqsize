@@ -20,6 +20,7 @@ export default function HandCaptureRect() {
     null
   );
   const streamRef = useRef<MediaStream | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Medidas reales del rectángulo (en mm)
   const realWidthMM = 200;
@@ -35,13 +36,59 @@ export default function HandCaptureRect() {
   };
 
   useEffect(() => {
-    // Initialize camera
-    navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
+    // Check if device is mobile
+    const checkMobile = () => {
+      const userAgent =
+        navigator.userAgent || navigator.vendor || (window as any).opera;
+      const mobileRegex =
+        /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
+      setIsMobile(mobileRegex.test(userAgent.toLowerCase()));
+    };
+    checkMobile();
+
+    // Initialize camera with back camera preference for mobile
+    const initializeCamera = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(
+          (device) => device.kind === "videoinput"
+        );
+
+        // Find back camera on mobile devices
+        const backCamera = isMobile
+          ? videoDevices.find((device) =>
+              device.label.toLowerCase().includes("back")
+            ) || videoDevices[videoDevices.length - 1]
+          : videoDevices[0];
+
+        const constraints = {
+          video: {
+            deviceId: backCamera ? { exact: backCamera.deviceId } : undefined,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: isMobile ? "environment" : "user",
+          },
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          streamRef.current = stream;
+        }
+      } catch (error) {
+        console.error("Error accessing camera:", error);
+        // Fallback to any available camera
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          streamRef.current = stream;
+        }
       }
-    });
+    };
+
+    initializeCamera();
 
     // Initialize hand landmarker
     const initializeHandLandmarker = async () => {
@@ -66,7 +113,7 @@ export default function HandCaptureRect() {
     };
 
     initializeHandLandmarker();
-  }, []);
+  }, [isMobile]);
 
   const processImage = async (imageUrl: string) => {
     if (!handLandmarker) {
@@ -429,7 +476,7 @@ export default function HandCaptureRect() {
   };
 
   return (
-    <div className="relative w-[480px] h-[360px] mx-auto">
+    <div className="relative w-full max-w-[480px] h-[360px] mx-auto">
       <video
         ref={videoRef}
         autoPlay
@@ -457,7 +504,8 @@ export default function HandCaptureRect() {
           width: `${pixelWidth}px`,
           height: `${pixelHeight}px`,
           top: "30px",
-          left: "90px",
+          left: "50%",
+          transform: "translateX(-50%)",
         }}
       >
         {/* Corner markers */}
@@ -513,7 +561,7 @@ export default function HandCaptureRect() {
       )}
 
       {showPopup && ringWidth !== null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-8 shadow-xl max-w-sm w-full mx-4">
             <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">
               Medida del Anillo

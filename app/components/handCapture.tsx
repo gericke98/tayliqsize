@@ -8,6 +8,7 @@ import {
   HandLandmarker,
   NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
+import cvReadyPromise from "@techstark/opencv-js";
 
 interface OpenCVMat {
   delete: () => void;
@@ -104,6 +105,9 @@ export default function HandCaptureRect() {
   );
   const streamRef = useRef<MediaStream | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [cv, setCv] = useState<typeof import("@techstark/opencv-js") | null>(
+    null
+  );
 
   const CAPTURE_SIZE = 300;
   const CARD_WIDTH_MM = 85.6;
@@ -117,6 +121,20 @@ export default function HandCaptureRect() {
       );
     };
     setIsMobile(checkMobile());
+  }, []);
+
+  useEffect(() => {
+    const initOpenCV = async () => {
+      try {
+        const cv = await cvReadyPromise;
+        console.log("OpenCV.js is ready!");
+        console.log(cv.getBuildInformation());
+        setCv(cv);
+      } catch (error) {
+        console.error("Error initializing OpenCV:", error);
+      }
+    };
+    initOpenCV();
   }, []);
 
   useEffect(() => {
@@ -173,8 +191,10 @@ export default function HandCaptureRect() {
   const warpImageByCard = async (
     canvas: HTMLCanvasElement
   ): Promise<{ canvas: HTMLCanvasElement; mmPerPixel: number } | null> => {
-    const cv = (window as OpenCV).cv;
-    if (!cv || !cv.imread) return null;
+    if (!cv) {
+      console.error("OpenCV not initialized");
+      return null;
+    }
 
     setStatusMessage("🃏 Detectando tarjeta...");
 
@@ -183,10 +203,12 @@ export default function HandCaptureRect() {
     const contours = new cv.MatVector();
     const hierarchy = new cv.Mat();
 
+    // Convert to grayscale and apply blur
     cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
     cv.GaussianBlur(src, src, new cv.Size(5, 5), 0);
     cv.Canny(src, dst, 50, 150);
 
+    // Find contours
     cv.findContours(
       dst,
       contours,
@@ -194,6 +216,8 @@ export default function HandCaptureRect() {
       cv.RETR_EXTERNAL,
       cv.CHAIN_APPROX_SIMPLE
     );
+
+    console.log("Número de contornos encontrados:", contours.size());
 
     let bestQuad = null;
     for (let i = 0; i < contours.size(); i++) {
@@ -206,11 +230,19 @@ export default function HandCaptureRect() {
         true
       );
 
+      console.log(`Contorno ${i}:`, {
+        puntos: approx.rows,
+        area: cv.contourArea(contour),
+      });
+
       if (approx.rows === 4) {
         const rect = cv.boundingRect(approx);
         const aspectRatio = rect.width / rect.height;
+        console.log(`Contorno ${i} - Aspect ratio:`, aspectRatio);
+
         if (aspectRatio > 1.4 && aspectRatio < 1.8) {
           bestQuad = approx.clone();
+          console.log("¡Tarjeta encontrada! Aspect ratio:", aspectRatio);
           approx.delete();
           break;
         }
@@ -218,7 +250,14 @@ export default function HandCaptureRect() {
       contour.delete();
     }
 
-    if (!bestQuad) return null;
+    if (!bestQuad) {
+      console.log("No se encontró ningún contorno con forma de tarjeta");
+      src.delete();
+      dst.delete();
+      contours.delete();
+      hierarchy.delete();
+      return null;
+    }
 
     setStatusMessage("📐 Corrigiendo perspectiva...");
 

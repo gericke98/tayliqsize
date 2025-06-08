@@ -8,88 +8,6 @@ import {
   HandLandmarker,
   NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
-import cvReadyPromise from "@techstark/opencv-js";
-
-interface OpenCVMat {
-  delete: () => void;
-  data32F: Float32Array;
-  rows: number;
-  cols: number;
-  clone: () => OpenCVMat;
-}
-
-interface OpenCV {
-  cv: {
-    imread: (canvas: HTMLCanvasElement) => OpenCVMat;
-    Mat: new () => OpenCVMat;
-    MatVector: new () => {
-      size: () => number;
-      get: (i: number) => OpenCVMat;
-      delete: () => void;
-    };
-    Size: new (width: number, height: number) => {
-      width: number;
-      height: number;
-    };
-    COLOR_RGBA2GRAY: number;
-    RETR_EXTERNAL: number;
-    CHAIN_APPROX_SIMPLE: number;
-    CV_32FC2: number;
-    cvtColor: (
-      src: OpenCVMat,
-      dst: OpenCVMat,
-      code: number,
-      dstCn: number
-    ) => void;
-    GaussianBlur: (
-      src: OpenCVMat,
-      dst: OpenCVMat,
-      ksize: { width: number; height: number },
-      sigmaX: number
-    ) => void;
-    Canny: (
-      src: OpenCVMat,
-      dst: OpenCVMat,
-      threshold1: number,
-      threshold2: number
-    ) => void;
-    findContours: (
-      image: OpenCVMat,
-      contours: { size: () => number; get: (i: number) => OpenCVMat },
-      hierarchy: OpenCVMat,
-      mode: number,
-      method: number
-    ) => void;
-    approxPolyDP: (
-      curve: OpenCVMat,
-      approxCurve: OpenCVMat,
-      epsilon: number,
-      closed: boolean
-    ) => void;
-    boundingRect: (points: OpenCVMat) => { width: number; height: number };
-    arcLength: (curve: OpenCVMat, closed: boolean) => number;
-    matFromArray: (
-      rows: number,
-      cols: number,
-      type: number,
-      array: number[]
-    ) => OpenCVMat;
-    getPerspectiveTransform: (src: OpenCVMat, dst: OpenCVMat) => OpenCVMat;
-    warpPerspective: (
-      src: OpenCVMat,
-      dst: OpenCVMat,
-      M: OpenCVMat,
-      dsize: { width: number; height: number }
-    ) => void;
-    imshow: (canvas: HTMLCanvasElement, mat: OpenCVMat) => void;
-  };
-}
-
-declare global {
-  interface Window {
-    cv: OpenCV["cv"];
-  }
-}
 
 export default function HandCaptureRect() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -100,17 +18,16 @@ export default function HandCaptureRect() {
   const [ringWidth, setRingWidth] = useState<number | null>(null);
   const [confidence, setConfidence] = useState<number | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [userHeight, setUserHeight] = useState<number | null>(null);
   const [handLandmarker, setHandLandmarker] = useState<HandLandmarker | null>(
     null
   );
   const streamRef = useRef<MediaStream | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [cv, setCv] = useState<typeof import("@techstark/opencv-js") | null>(
-    null
-  );
+  const [showHeightInput, setShowHeightInput] = useState(true);
 
   const CAPTURE_SIZE = 300;
-  const CARD_WIDTH_MM = 85.6;
+  // const CARD_WIDTH_MM = 85.6;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -121,20 +38,6 @@ export default function HandCaptureRect() {
       );
     };
     setIsMobile(checkMobile());
-  }, []);
-
-  useEffect(() => {
-    const initOpenCV = async () => {
-      try {
-        const cv = await cvReadyPromise;
-        console.log("OpenCV.js is ready!");
-        console.log(cv.getBuildInformation());
-        setCv(cv);
-      } catch (error) {
-        console.error("Error initializing OpenCV:", error);
-      }
-    };
-    initOpenCV();
   }, []);
 
   useEffect(() => {
@@ -160,12 +63,14 @@ export default function HandCaptureRect() {
       }
     };
 
-    initializeCamera();
+    if (!showHeightInput) {
+      initializeCamera();
+    }
 
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [isMobile]);
+  }, [isMobile, showHeightInput]);
 
   const initializeHandLandmarker = async () => {
     try {
@@ -188,185 +93,69 @@ export default function HandCaptureRect() {
     }
   };
 
-  const warpImageByCard = async (
-    canvas: HTMLCanvasElement
-  ): Promise<{ canvas: HTMLCanvasElement; mmPerPixel: number } | null> => {
-    if (!cv) {
-      console.error("OpenCV not initialized");
-      return null;
-    }
-
-    setStatusMessage("🃏 Detectando tarjeta...");
-
-    const src = cv.imread(canvas);
-    const dst = new cv.Mat();
-    const contours = new cv.MatVector();
-    const hierarchy = new cv.Mat();
-
-    // Convert to grayscale and apply blur
-    cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
-    cv.GaussianBlur(src, src, new cv.Size(5, 5), 0);
-    cv.Canny(src, dst, 50, 150);
-
-    // Find contours
-    cv.findContours(
-      dst,
-      contours,
-      hierarchy,
-      cv.RETR_EXTERNAL,
-      cv.CHAIN_APPROX_SIMPLE
-    );
-
-    console.log("Número de contornos encontrados:", contours.size());
-
-    let bestQuad = null;
-    for (let i = 0; i < contours.size(); i++) {
-      const contour = contours.get(i);
-      const approx = new cv.Mat();
-      cv.approxPolyDP(
-        contour,
-        approx,
-        0.02 * cv.arcLength(contour, true),
-        true
-      );
-
-      console.log(`Contorno ${i}:`, {
-        puntos: approx.rows,
-        area: cv.contourArea(contour),
-      });
-
-      if (approx.rows === 4) {
-        const rect = cv.boundingRect(approx);
-        const aspectRatio = rect.width / rect.height;
-        console.log(`Contorno ${i} - Aspect ratio:`, aspectRatio);
-
-        if (aspectRatio > 1.4 && aspectRatio < 1.8) {
-          bestQuad = approx.clone();
-          console.log("¡Tarjeta encontrada! Aspect ratio:", aspectRatio);
-          approx.delete();
-          break;
-        }
-      }
-      contour.delete();
-    }
-
-    if (!bestQuad) {
-      console.log("No se encontró ningún contorno con forma de tarjeta");
-      src.delete();
-      dst.delete();
-      contours.delete();
-      hierarchy.delete();
-      return null;
-    }
-
-    setStatusMessage("📐 Corrigiendo perspectiva...");
-
-    const sorted = [];
-    for (let i = 0; i < 4; i++) {
-      sorted.push({
-        x: bestQuad.data32F[i * 2],
-        y: bestQuad.data32F[i * 2 + 1],
-      });
-    }
-
-    sorted.sort((a, b) => a.y - b.y);
-    const [tl, tr] =
-      sorted[0].x < sorted[1].x
-        ? [sorted[0], sorted[1]]
-        : [sorted[1], sorted[0]];
-    const [bl, br] =
-      sorted[2].x < sorted[3].x
-        ? [sorted[2], sorted[3]]
-        : [sorted[3], sorted[2]];
-
-    const width = Math.max(
-      Math.hypot(tr.x - tl.x, tr.y - tl.y),
-      Math.hypot(br.x - bl.x, br.y - bl.y)
-    );
-    const height = Math.max(
-      Math.hypot(bl.x - tl.x, bl.y - tl.y),
-      Math.hypot(br.x - tr.x, br.y - tr.y)
-    );
-
-    const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-      tl.x,
-      tl.y,
-      tr.x,
-      tr.y,
-      br.x,
-      br.y,
-      bl.x,
-      bl.y,
-    ]);
-    const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-      0,
-      0,
-      width,
-      0,
-      width,
-      height,
-      0,
-      height,
-    ]);
-
-    const M = cv.getPerspectiveTransform(srcTri, dstTri);
-    const warped = new cv.Mat();
-    cv.warpPerspective(src, warped, M, new cv.Size(width, height));
-
-    const warpedCanvas = document.createElement("canvas");
-    warpedCanvas.width = width;
-    warpedCanvas.height = height;
-    cv.imshow(warpedCanvas, warped);
-
-    src.delete();
-    dst.delete();
-    contours.delete();
-    hierarchy.delete();
-    bestQuad.delete();
-    M.delete();
-    srcTri.delete();
-    dstTri.delete();
-    warped.delete();
-
-    const mmPerPixel = CARD_WIDTH_MM / width;
-
-    return { canvas: warpedCanvas, mmPerPixel };
-  };
-
   const processImage = async (
     imageUrl: string,
     handLandmarker: HandLandmarker,
     setConfidence: (c: number) => void,
     setRingWidth: (w: number) => void,
     setShowPopup: (b: boolean) => void,
-    overlayCanvasRef: React.RefObject<HTMLCanvasElement | null>,
-    mmPerPixel: number
+    overlayCanvasRef: React.RefObject<HTMLCanvasElement | null>
   ) => {
+    console.log("processImage", imageUrl);
     try {
+      console.log("Starting processImage with:", {
+        imageUrl: imageUrl.substring(0, 50) + "...",
+        userHeight,
+        hasOverlayCanvas: !!overlayCanvasRef.current,
+      });
+
       const img = document.createElement("img");
       img.src = imageUrl;
       img.width = CAPTURE_SIZE;
       img.height = CAPTURE_SIZE;
       await new Promise<void>((res) => (img.onload = () => res()));
 
+      console.log("Image loaded, dimensions:", {
+        width: img.width,
+        height: img.height,
+      });
+
       const ctx = overlayCanvasRef.current?.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) {
+        console.error("No canvas context available");
+        return;
+      }
 
       ctx.clearRect(0, 0, CAPTURE_SIZE, CAPTURE_SIZE);
       ctx.drawImage(img, 0, 0, CAPTURE_SIZE, CAPTURE_SIZE);
 
+      console.log("Running hand landmarker detection...");
       const results = handLandmarker.detect(img);
-      if (!results.landmarks.length) return;
+
+      if (!results.landmarks.length) {
+        console.log("No hand landmarks detected");
+        return;
+      }
 
       const landmarks = results.landmarks[0];
-      const worldLandmarks = results.worldLandmarks[0];
 
-      const avgConfidence =
-        worldLandmarks.reduce((sum, l) => sum + l.z, 0) / worldLandmarks.length;
+      const avgConfidence = results.handedness[0][0].score;
+      console.log("Average confidence:", avgConfidence);
       setConfidence(Number((avgConfidence * 100).toFixed(1)));
 
       const px = (l: NormalizedLandmark) => l.x * CAPTURE_SIZE;
       const py = (l: NormalizedLandmark) => l.y * CAPTURE_SIZE;
+
+      // Calculate hand length in pixels (from base of palm to middle finger tip)
+      const handLengthPx = Math.hypot(
+        px(landmarks[0]) - px(landmarks[12]),
+        py(landmarks[0]) - py(landmarks[12])
+      );
+
+      // Calculate mm per pixel ratio based on height
+      // Hand length is approximately 10% of body height (* 0.1 (conversion) * 10 (cm to mm))
+      const expectedHandLengthMM = userHeight || 0;
+      const mmPerPixel = expectedHandLengthMM / handLengthPx;
 
       const dist = (p: NormalizedLandmark, q: NormalizedLandmark) =>
         Math.hypot(px(p) - px(q), py(p) - py(q)) * mmPerPixel;
@@ -374,6 +163,15 @@ export default function HandCaptureRect() {
       const pipRingToMiddle = dist(landmarks[14], landmarks[10]);
       const pipMiddleToIndex = dist(landmarks[10], landmarks[6]);
       const avgWidthMM = (pipRingToMiddle + pipMiddleToIndex) / 2;
+
+      console.log("Measurements:", {
+        handLengthPx,
+        expectedHandLengthMM,
+        mmPerPixel,
+        pipRingToMiddle,
+        pipMiddleToIndex,
+        avgWidthMM,
+      });
 
       setRingWidth(Number((avgWidthMM / 10).toFixed(1)));
       setShowPopup(true);
@@ -391,12 +189,27 @@ export default function HandCaptureRect() {
         color: "#FF0000",
         lineWidth: 1,
       });
+
+      console.log("Process completed successfully");
     } catch (err) {
-      console.error("Error processing image:", err);
+      console.error("Error in processImage:", err);
     }
   };
+
   const capture = async () => {
-    if (!videoRef.current || !canvasRef.current || !handLandmarker) return;
+    if (
+      !videoRef.current ||
+      !canvasRef.current ||
+      !handLandmarker ||
+      !userHeight
+    )
+      return;
+
+    // Reset states for new capture
+    setCapturedImage(null);
+    setConfidence(null);
+    setRingWidth(null);
+    setShowPopup(false);
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -423,72 +236,92 @@ export default function HandCaptureRect() {
       CAPTURE_SIZE
     );
 
-    const warped = await warpImageByCard(canvas);
-    if (!warped) {
-      alert(
-        "No se pudo corregir la perspectiva de la tarjeta. Asegúrate de que esté visible y bien encuadrada."
-      );
-      return;
-    }
-
+    const imageData = canvas.toDataURL("image/jpeg");
+    setCapturedImage(imageData);
     setStatusMessage("✋ Midiendo dedo...");
 
-    const imageData = warped.canvas.toDataURL("image/jpeg", 1.0);
-    setCapturedImage(imageData);
-
-    await processImage(
-      imageData,
-      handLandmarker,
-      setConfidence,
-      setRingWidth,
-      setShowPopup,
-      overlayCanvasRef,
-      warped.mmPerPixel
-    );
+    if (imageData && handLandmarker) {
+      await processImage(
+        imageData,
+        handLandmarker,
+        setConfidence,
+        setRingWidth,
+        setShowPopup,
+        overlayCanvasRef
+      );
+    }
 
     setStatusMessage(null);
-
     streamRef.current?.getTracks().forEach((t) => t.stop());
   };
 
   return (
     <div className="relative w-full max-w-[480px] h-[360px] mx-auto">
-      {statusMessage && (
-        <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 bg-white rounded-full shadow-md text-sm text-gray-800">
-          {statusMessage}
+      {showHeightInput ? (
+        <div className="absolute inset-0 bg-white/90 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm">
+            <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">
+              Ingresa tu altura
+            </h3>
+            <div className="flex items-center gap-2 mb-4">
+              <input
+                type="number"
+                value={userHeight || ""}
+                onChange={(e) => setUserHeight(Number(e.target.value))}
+                placeholder="Altura en cm"
+                className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+              />
+              <span className="text-gray-600">cm</span>
+            </div>
+            <button
+              onClick={() => setShowHeightInput(false)}
+              disabled={!userHeight}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors duration-200 disabled:bg-gray-400"
+            >
+              Continuar
+            </button>
+          </div>
         </div>
+      ) : (
+        <>
+          {statusMessage && (
+            <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 bg-white rounded-full shadow-md text-sm text-gray-800">
+              {statusMessage}
+            </div>
+          )}
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="absolute top-0 left-0 w-full h-full object-cover rounded-2xl shadow-lg scale-x-[-1]"
+          />
+
+          <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+            <div
+              className="absolute border-4 border-white/90 rounded-lg shadow-lg"
+              style={{
+                width: `${CAPTURE_SIZE}px`,
+                height: `${CAPTURE_SIZE}px`,
+                top: "30px",
+                left: "50%",
+                transform: "translateX(-50%)",
+              }}
+            ></div>
+          </div>
+
+          <canvas ref={canvasRef} className="hidden" />
+
+          <button
+            onClick={capture}
+            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-6 py-3 rounded-full shadow-lg hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 z-10"
+          >
+            Tomar foto
+          </button>
+        </>
       )}
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        playsInline
-        className="absolute top-0 left-0 w-full h-full object-cover rounded-2xl shadow-lg scale-x-[-1]"
-      />
 
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-        <div
-          className="absolute border-4 border-white/90 rounded-lg shadow-lg"
-          style={{
-            width: `${CAPTURE_SIZE}px`,
-            height: `${CAPTURE_SIZE}px`,
-            top: "30px",
-            left: "50%",
-            transform: "translateX(-50%)",
-          }}
-        ></div>
-      </div>
-
-      <canvas ref={canvasRef} className="hidden" />
-
-      <button
-        onClick={capture}
-        className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-6 py-3 rounded-full shadow-lg hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 z-10"
-      >
-        Tomar foto
-      </button>
-
-      {capturedImage && (
+      {capturedImage && !showHeightInput && (
         <div className="mt-8 text-center">
           <div
             className="relative mx-auto bg-white rounded-2xl shadow-xl overflow-hidden"
@@ -528,7 +361,7 @@ export default function HandCaptureRect() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm mx-auto">
             <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">
-              Medida del Anillo
+              Medida del Dedo Anular
             </h3>
             <p className="text-4xl font-bold text-blue-600 text-center mb-2">
               {ringWidth} cm

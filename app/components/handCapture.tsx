@@ -318,7 +318,7 @@ export default function HandCaptureRect() {
   return (
     <div className="relative w-full max-w-[480px] mx-auto">
       {showHeightInput ? (
-        <div className="flex flex-col items-center justify-center min-h-[360px] p-4">
+        <div className="flex flex-col items-center justify-center min-h-[100dvh] p-4">
           <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm">
             <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
               Configuración Inicial
@@ -334,7 +334,9 @@ export default function HandCaptureRect() {
                     value={userHeight || ""}
                     onChange={(e) => setUserHeight(Number(e.target.value))}
                     placeholder="Ingresa tu altura"
-                    className="flex-1 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black bg-gray-50"
+                    className="flex-1 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black bg-gray-50 text-lg"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                   />
                   <span className="text-gray-600 font-medium">cm</span>
                 </div>
@@ -351,7 +353,7 @@ export default function HandCaptureRect() {
                   <div className="space-y-3">
                     <button
                       onClick={handleUseDefaultGuide}
-                      className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                      className={`w-full px-4 py-4 rounded-lg border transition-colors ${
                         useDefaultGuide
                           ? "bg-blue-50 border-blue-500 text-blue-700"
                           : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
@@ -374,7 +376,7 @@ export default function HandCaptureRect() {
                         type="file"
                         accept=".pdf,.jpg,.jpeg,.png,.webp"
                         onChange={handleFileChange}
-                        className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black bg-gray-50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        className="w-full px-4 py-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black bg-gray-50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                       />
                     </div>
                   </div>
@@ -394,11 +396,11 @@ export default function HandCaptureRect() {
                             setUseDefaultGuide(false);
                             setSizeGuidePreview(null);
                           }}
-                          className="absolute top-2 right-2 p-1 bg-white/80 rounded-full hover:bg-white transition-colors"
+                          className="absolute top-2 right-2 p-2 bg-white/80 rounded-full hover:bg-white transition-colors"
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 text-gray-600"
+                            className="h-6 w-6 text-gray-600"
                             viewBox="0 0 20 20"
                             fill="currentColor"
                           >
@@ -423,7 +425,7 @@ export default function HandCaptureRect() {
                 disabled={
                   !userHeight || (!sizeGuidePreview && !useDefaultGuide)
                 }
-                className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors duration-200 disabled:bg-gray-400 font-medium text-lg"
+                className="w-full bg-blue-600 text-white py-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors duration-200 disabled:bg-gray-400 font-medium text-lg"
               >
                 Comenzar Medición
               </button>
@@ -440,9 +442,9 @@ export default function HandCaptureRect() {
           </div>
         </div>
       ) : (
-        <div className="relative w-full h-[360px]">
+        <div className="relative w-full h-[100dvh]">
           {statusMessage && (
-            <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 bg-white rounded-full shadow-lg text-sm text-gray-800 font-medium">
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 bg-white rounded-full shadow-lg text-sm text-gray-800 font-medium">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((step) => (
@@ -463,7 +465,7 @@ export default function HandCaptureRect() {
             autoPlay
             muted
             playsInline
-            className="absolute top-0 left-0 w-full h-full object-cover rounded-2xl shadow-lg scale-x-[-1]"
+            className="absolute top-0 left-0 w-full h-full object-cover scale-x-[-1]"
           />
 
           <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
@@ -472,9 +474,9 @@ export default function HandCaptureRect() {
               style={{
                 width: `${CAPTURE_SIZE}px`,
                 height: `${CAPTURE_SIZE}px`,
-                top: "30px",
+                top: "50%",
                 left: "50%",
-                transform: "translateX(-50%)",
+                transform: "translate(-50%, -50%)",
               }}
             >
               <div className="absolute inset-0 flex items-center justify-center">
@@ -489,7 +491,7 @@ export default function HandCaptureRect() {
 
           <button
             onClick={capture}
-            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-8 py-4 rounded-full shadow-lg hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 z-10 font-medium text-lg flex items-center gap-2"
+            className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-white text-black px-8 py-4 rounded-full shadow-lg hover:bg-gray-100 active:bg-gray-200 transition-colors duration-200 z-10 font-medium text-lg flex items-center gap-2"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -572,8 +574,8 @@ export default function HandCaptureRect() {
             </div>
             <div className="space-y-3">
               <Link href="https://woonder.es/en/collections/anillos/products/anillo-sayu-magenta">
-                <button className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors duration-200 font-medium">
-                  Cerrar
+                <button className="w-full bg-blue-600 text-white py-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors duration-200 font-medium text-lg">
+                  Ver en Woonder
                 </button>
               </Link>
               <button
@@ -582,7 +584,7 @@ export default function HandCaptureRect() {
                   setShowHeightInput(true);
                   setRecommendation(null);
                 }}
-                className="w-full bg-gray-100 text-gray-700 py-3 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200 font-medium"
+                className="w-full bg-gray-100 text-gray-700 py-4 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-colors duration-200 font-medium text-lg"
               >
                 Nueva Medición
               </button>

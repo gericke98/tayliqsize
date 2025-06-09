@@ -1,24 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ring Size Measurement App
+
+A web application that helps users measure their ring size using computer vision and AI.
+
+## Features
+
+- Real-time hand tracking using MediaPipe
+- Accurate ring size measurement based on finger width
+- AI-powered size recommendations using OpenAI's GPT-4 Vision
+- Support for custom size guides
+- Mobile-friendly interface
+
+## Technologies Used
+
+- **Next.js 14** - React framework for building the application
+- **MediaPipe** - For hand tracking and landmark detection
+- **OpenAI GPT-4 Vision** - For analyzing size guides and providing recommendations
+- **Tailwind CSS** - For styling
+- **TypeScript** - For type safety
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Create a `.env.local` file with your OpenAI API key:
+   ```
+   OPENAI_API_KEY=your_api_key_here
+   ```
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## How It Works
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. The app uses MediaPipe's hand tracking to detect finger landmarks
+2. It calculates the finger width based on the landmarks and user's height
+3. The size guide (either default or custom) is sent to OpenAI's GPT-4 Vision
+4. GPT-4 analyzes the guide and provides a size recommendation with confidence level
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `OPENAI_API_KEY`: Your OpenAI API key for GPT-4 Vision access
+
+## License
+
+MIT
 
 ## Learn More
 

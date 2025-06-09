@@ -602,7 +602,7 @@ export default function HandCaptureRect() {
             <div className="space-y-3">
               <Link href="https://woonder.es/en/collections/anillos/products/anillo-sayu-magenta">
                 <button className="w-full bg-blue-600 text-white py-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors duration-200 font-medium text-lg">
-                  Cerrar
+                  Volver al producto
                 </button>
               </Link>
               <button
